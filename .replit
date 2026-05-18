@@ -18,3 +18,25 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 20000
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 18944
+externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+VITE_FIREBASE_API_KEY = "AIzaSyCb0quHbtMsqIL34mmGsImYG2EQXfAtYyU"
+VITE_FIREBASE_AUTH_DOMAIN = "luminacloud-1a1fe.firebaseapp.com"
+VITE_FIREBASE_PROJECT_ID = "luminacloud-1a1fe"
+VITE_FIREBASE_STORAGE_BUCKET = "luminacloud-1a1fe.firebasestorage.app"
+VITE_FIREBASE_MESSAGING_SENDER_ID = "984839317373"
+VITE_FIREBASE_APP_ID = "1:984839317373:web:63d203f479ac70c881ce14"
