@@ -25,19 +25,9 @@ export interface Book {
   category: string;
 }
 
-interface CloudinarySignResponse {
-  signature: string;
-  timestamp: number;
-  folder: string;
-  api_key: string;
-  cloud_name: string;
-}
-
-async function getUploadSignature(): Promise<CloudinarySignResponse> {
-  const res = await fetch("/api/cloudinary/sign?folder=lumina-books");
-  if (!res.ok) throw new Error("Failed to get upload signature");
-  return res.json() as Promise<CloudinarySignResponse>;
-}
+const CLOUDINARY_CLOUD_NAME = "djpxkbn8x";
+const CLOUDINARY_UPLOAD_PRESET = "luminacloud";
+const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/raw/upload`;
 
 export async function uploadBook(
   file: File,
@@ -46,23 +36,15 @@ export async function uploadBook(
   userName: string,
   onProgress?: (pct: number) => void
 ): Promise<Book> {
-  // 1. Get a signed upload ticket from our API server
-  const sig = await getUploadSignature();
-
-  // 2. Upload directly to Cloudinary using XHR (supports progress events)
+  // Upload directly to Cloudinary using unsigned preset
   const formData = new FormData();
   formData.append("file", file);
-  formData.append("api_key", sig.api_key);
-  formData.append("timestamp", String(sig.timestamp));
-  formData.append("signature", sig.signature);
-  formData.append("folder", sig.folder);
-
-  const uploadUrl = `https://api.cloudinary.com/v1_1/${sig.cloud_name}/raw/upload`;
+  formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
 
   const cloudinaryResponse = await new Promise<{ secure_url: string; public_id: string }>(
     (resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", uploadUrl, true);
+      xhr.open("POST", CLOUDINARY_UPLOAD_URL, true);
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
@@ -72,18 +54,33 @@ export async function uploadBook(
 
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          resolve(JSON.parse(xhr.responseText) as { secure_url: string; public_id: string });
+          try {
+            const data = JSON.parse(xhr.responseText) as { secure_url: string; public_id: string };
+            resolve(data);
+          } catch {
+            reject(new Error("Invalid response from Cloudinary"));
+          }
         } else {
-          reject(new Error(`Cloudinary upload failed: ${xhr.status} ${xhr.responseText}`));
+          let message = `Upload failed (${xhr.status})`;
+          try {
+            const err = JSON.parse(xhr.responseText) as { error?: { message?: string } };
+            if (err?.error?.message) message = err.error.message;
+          } catch {
+            // keep default message
+          }
+          reject(new Error(message));
         }
       };
 
-      xhr.onerror = () => reject(new Error("Network error during upload"));
+      xhr.onerror = () => reject(new Error("Network error — check your connection and try again"));
+      xhr.ontimeout = () => reject(new Error("Upload timed out — please try again"));
+      xhr.timeout = 120000; // 2 minute timeout
+
       xhr.send(formData);
     }
   );
 
-  // 3. Save metadata + Cloudinary URL to Firestore
+  // Save metadata + Cloudinary URL to Firestore
   const docRef = await addDoc(collection(db, "books"), {
     ...metadata,
     fileUrl: cloudinaryResponse.secure_url,
@@ -113,10 +110,10 @@ export async function getBooks(): Promise<Book[]> {
 }
 
 export async function deleteBook(book: Book): Promise<void> {
-  // Delete Firestore document
+  // Delete Firestore document first
   await deleteDoc(doc(db, "books", book.id));
 
-  // Ask API server to delete from Cloudinary
+  // Ask API server to delete from Cloudinary (non-fatal if it fails)
   if (book.publicId) {
     try {
       await fetch("/api/cloudinary/delete", {
