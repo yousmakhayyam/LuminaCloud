@@ -34,17 +34,7 @@ export default function BookCard({ book, onDeleted }: BookCardProps) {
   };
 
   const handleDownload = () => {
-    // Inject fl_attachment into the Cloudinary URL to force a file download
-    // instead of the browser opening the PDF inline.
-    // e.g. .../raw/upload/v123/file.pdf → .../raw/upload/fl_attachment/v123/file.pdf
-    const downloadUrl = book.fileUrl.replace("/upload/", "/upload/fl_attachment/");
-    const a = document.createElement("a");
-    a.href = downloadUrl;
-    a.download = `${book.title}.pdf`;
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    window.open(book.fileUrl, "_blank");
   };
 
   const handleDelete = async () => {
