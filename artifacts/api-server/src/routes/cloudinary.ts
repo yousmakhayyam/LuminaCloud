@@ -1,24 +1,11 @@
 import { Router } from "express";
 import { v2 as cloudinary } from "cloudinary";
 import multer from "multer";
-import { Readable } from "stream";
 
 const router = Router();
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Keep files in memory (no disk I/O needed — we stream straight to Cloudinary)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB hard cap
-  fileFilter: (_req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
-      cb(null, true);
-    } else {
-      cb(new Error("Only PDF files are accepted"));
-    }
-  },
-});
-
-function configureCloudinary() {
+function initCloudinary() {
   const cloudName = process.env["CLOUDINARY_CLOUD_NAME"];
   const apiKey = process.env["CLOUDINARY_API_KEY"];
   const apiSecret = process.env["CLOUDINARY_API_SECRET"];
@@ -29,51 +16,41 @@ function configureCloudinary() {
   return cloudinary;
 }
 
-function uploadBufferToCloudinary(
-  buffer: Buffer,
-  folder: string
-): Promise<{ secure_url: string; public_id: string }> {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: "raw",
-        folder,
-        // 6 MB chunks — well within Cloudinary's chunked upload minimum (5 MB)
-        chunk_size: 6 * 1024 * 1024,
-        use_filename: false,
-        unique_filename: true,
-      },
-      (error, result) => {
-        if (error) return reject(error);
-        if (!result) return reject(new Error("No result from Cloudinary"));
-        resolve({ secure_url: result.secure_url, public_id: result.public_id });
-      }
-    );
-    Readable.from(buffer).pipe(stream);
-  });
-}
-
-// POST /api/books/upload — accepts a PDF, streams it to Cloudinary in chunks
+// POST /api/cloudinary/upload — streams file to Cloudinary using the SDK (no size limit)
 router.post(
-  "/books/upload",
+  "/cloudinary/upload",
   upload.single("file"),
-  async (req, res) => {
+  (req, res) => {
+    if (!req.file) {
+      res.status(400).json({ error: "No file provided" });
+      return;
+    }
+
     try {
-      if (!req.file) {
-        res.status(400).json({ error: "No PDF file provided" });
-        return;
-      }
+      const cl = initCloudinary();
 
-      configureCloudinary();
+      const uploadStream = cl.uploader.upload_stream(
+        {
+          resource_type: "raw",
+          folder: "lumina-books",
+          use_filename: true,
+          unique_filename: true,
+          chunk_size: 6 * 1024 * 1024, // 6 MB chunks
+        },
+        (error, result) => {
+          if (error || !result) {
+            req.log.error({ error }, "Cloudinary upload failed");
+            res.status(500).json({ error: error?.message ?? "Upload failed" });
+            return;
+          }
+          res.json({ secure_url: result.secure_url, public_id: result.public_id });
+        }
+      );
 
-      const folder = (req.query["folder"] as string | undefined) ?? "lumina-books";
-      const result = await uploadBufferToCloudinary(req.file.buffer, folder);
-
-      res.json(result);
+      uploadStream.end(req.file.buffer);
     } catch (err) {
-      req.log.error({ err }, "Cloudinary upload failed");
-      const message = err instanceof Error ? err.message : "Upload failed";
-      res.status(500).json({ error: message });
+      req.log.error({ err }, "Cloudinary upload error");
+      res.status(500).json({ error: "Upload failed" });
     }
   }
 );
@@ -81,13 +58,13 @@ router.post(
 // POST /api/cloudinary/delete — deletes a file by public_id
 router.post("/cloudinary/delete", async (req, res) => {
   try {
-    configureCloudinary();
+    const cl = initCloudinary();
     const { publicId } = req.body as { publicId?: string };
     if (!publicId) {
       res.status(400).json({ error: "publicId is required" });
       return;
     }
-    await cloudinary.uploader.destroy(publicId, { resource_type: "raw" });
+    await cl.uploader.destroy(publicId, { resource_type: "raw" });
     res.json({ success: true });
   } catch (err) {
     req.log.error({ err }, "Cloudinary delete failed");

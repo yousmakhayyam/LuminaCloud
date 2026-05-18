@@ -25,10 +25,6 @@ export interface Book {
   category: string;
 }
 
-/**
- * Uploads a PDF to Cloudinary via the API server (which uses chunked streaming,
- * bypassing the 10 MB unsigned-upload limit), then saves metadata to Firestore.
- */
 export async function uploadBook(
   file: File,
   metadata: { title: string; author: string; description: string; category: string },
@@ -36,29 +32,26 @@ export async function uploadBook(
   userName: string,
   onProgress?: (pct: number) => void
 ): Promise<Book> {
-  // Build multipart form — the API server handles the Cloudinary upload
+  // Build multipart form — file goes to our API server which uses the
+  // Cloudinary SDK with chunked streaming, bypassing the 10 MB browser limit.
   const formData = new FormData();
   formData.append("file", file);
 
-  // Use XHR so we get upload-progress events (fetch doesn't support that)
-  const cloudinaryResult = await new Promise<{ secure_url: string; public_id: string }>(
+  const response = await new Promise<{ secure_url: string; public_id: string }>(
     (resolve, reject) => {
       const xhr = new XMLHttpRequest();
-      xhr.open("POST", "/api/books/upload?folder=lumina-books", true);
+      xhr.open("POST", "/api/cloudinary/upload", true);
 
       xhr.upload.onprogress = (e) => {
         if (e.lengthComputable) {
-          // Scale progress to 0–90 % — the remaining 10 % is Cloudinary processing
-          onProgress?.(Math.min(90, Math.round((e.loaded / e.total) * 90)));
+          onProgress?.(Math.round((e.loaded / e.total) * 100));
         }
       };
 
       xhr.onload = () => {
         if (xhr.status >= 200 && xhr.status < 300) {
           try {
-            const data = JSON.parse(xhr.responseText) as { secure_url: string; public_id: string };
-            onProgress?.(100);
-            resolve(data);
+            resolve(JSON.parse(xhr.responseText) as { secure_url: string; public_id: string });
           } catch {
             reject(new Error("Invalid response from upload server"));
           }
@@ -75,8 +68,8 @@ export async function uploadBook(
       };
 
       xhr.onerror = () => reject(new Error("Network error — check your connection and try again"));
-      xhr.ontimeout = () => reject(new Error("Upload timed out — the file may be too large"));
-      xhr.timeout = 300_000; // 5 minutes
+      xhr.ontimeout = () => reject(new Error("Upload timed out — please try again"));
+      xhr.timeout = 300_000; // 5 minutes for large files
 
       xhr.send(formData);
     }
@@ -85,8 +78,8 @@ export async function uploadBook(
   // Save metadata + Cloudinary URL to Firestore
   const docRef = await addDoc(collection(db, "books"), {
     ...metadata,
-    fileUrl: cloudinaryResult.secure_url,
-    publicId: cloudinaryResult.public_id,
+    fileUrl: response.secure_url,
+    publicId: response.public_id,
     fileSize: file.size,
     uploadedBy: userId,
     uploadedByName: userName,
@@ -96,8 +89,8 @@ export async function uploadBook(
   return {
     id: docRef.id,
     ...metadata,
-    fileUrl: cloudinaryResult.secure_url,
-    publicId: cloudinaryResult.public_id,
+    fileUrl: response.secure_url,
+    publicId: response.public_id,
     fileSize: file.size,
     uploadedBy: userId,
     uploadedByName: userName,
