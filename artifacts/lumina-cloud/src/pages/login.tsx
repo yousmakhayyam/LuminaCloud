@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Cloud, BookOpen, Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { firebaseConfigured } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -38,6 +39,8 @@ export default function LoginPage() {
       const friendly =
         msg.includes("user-not-found") || msg.includes("wrong-password") || msg.includes("invalid-credential")
           ? "Invalid email or password."
+          : msg.includes("Firebase auth not initialized")
+          ? "Firebase is not configured locally. Add the VITE_FIREBASE_* env vars and restart the dev server."
           : "Something went wrong. Please try again.";
       toast({ title: "Sign in failed", description: friendly, variant: "destructive" });
     } finally {
@@ -72,6 +75,12 @@ export default function LoginPage() {
         <div className="bg-[#0d1526]/80 border border-white/10 rounded-2xl p-8 backdrop-blur shadow-xl">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+              {!firebaseConfigured && (
+                <div className="rounded-2xl border border-yellow-400/70 bg-yellow-500/10 p-4 text-sm text-yellow-100">
+                  Firebase is not configured locally. Copy `artifacts/lumina-cloud/.env.example` to `.env.local`, fill in your
+                  `VITE_FIREBASE_*` values, and restart the dev server.
+                </div>
+              )}
               <FormField
                 control={form.control}
                 name="email"
@@ -125,7 +134,7 @@ export default function LoginPage() {
 
               <Button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !firebaseConfigured}
                 className="w-full bg-indigo-600 hover:bg-indigo-500 text-white border-0 gap-2 shadow-lg shadow-indigo-600/20"
                 data-testid="button-submit"
               >

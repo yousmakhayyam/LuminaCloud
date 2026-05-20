@@ -9,7 +9,7 @@ import {
   serverTimestamp,
   Timestamp,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, firebaseConfigured } from "@/lib/firebase";
 
 export interface Book {
   id: string;
@@ -23,6 +23,21 @@ export interface Book {
   uploadedByName: string;
   createdAt: Timestamp | null;
   category: string;
+}
+
+const BOOKS_STORAGE_KEY = "lumina-books";
+
+function loadLocalBooks(): Book[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return JSON.parse(window.localStorage.getItem(BOOKS_STORAGE_KEY) ?? "[]");
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalBooks(books: Book[]) {
+  window.localStorage.setItem(BOOKS_STORAGE_KEY, JSON.stringify(books));
 }
 
 export async function uploadBook(
@@ -75,19 +90,11 @@ export async function uploadBook(
     }
   );
 
-  // Save metadata + Cloudinary URL to Firestore
-  const docRef = await addDoc(collection(db, "books"), {
-    ...metadata,
-    fileUrl: response.secure_url,
-    publicId: response.public_id,
-    fileSize: file.size,
-    uploadedBy: userId,
-    uploadedByName: userName,
-    createdAt: serverTimestamp(),
-  });
-
-  return {
-    id: docRef.id,
+  const book: Book = {
+    id:
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : `local-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`,
     ...metadata,
     fileUrl: response.secure_url,
     publicId: response.public_id,
@@ -96,16 +103,45 @@ export async function uploadBook(
     uploadedByName: userName,
     createdAt: null,
   };
+
+  if (firebaseConfigured) {
+    const docRef = await addDoc(collection(db, "books"), {
+      ...metadata,
+      fileUrl: response.secure_url,
+      publicId: response.public_id,
+      fileSize: file.size,
+      uploadedBy: userId,
+      uploadedByName: userName,
+      createdAt: serverTimestamp(),
+    });
+
+    return {
+      ...book,
+      id: docRef.id,
+    };
+  }
+
+  saveLocalBooks([book, ...loadLocalBooks()]);
+  return book;
 }
 
 export async function getBooks(): Promise<Book[]> {
-  const q = query(collection(db, "books"), orderBy("createdAt", "desc"));
-  const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Book));
+  if (firebaseConfigured) {
+    const q = query(collection(db, "books"), orderBy("createdAt", "desc"));
+    const snap = await getDocs(q);
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() } as Book));
+  }
+
+  return loadLocalBooks();
 }
 
 export async function deleteBook(book: Book): Promise<void> {
-  await deleteDoc(doc(db, "books", book.id));
+  if (firebaseConfigured) {
+    await deleteDoc(doc(db, "books", book.id));
+  } else {
+    saveLocalBooks(loadLocalBooks().filter((b) => b.id !== book.id));
+  }
+
   if (book.publicId) {
     try {
       await fetch("/api/cloudinary/delete", {
@@ -114,7 +150,7 @@ export async function deleteBook(book: Book): Promise<void> {
         body: JSON.stringify({ publicId: book.publicId }),
       });
     } catch {
-      // Non-fatal — Firestore doc is already deleted
+      // Non-fatal — Cloudinary deletion is best effort
     }
   }
 }
