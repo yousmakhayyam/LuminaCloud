@@ -19,16 +19,23 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-function getLocalUsers() {
-  if (typeof window === "undefined") return [] as Array<{ uid: string; email: string; password: string; displayName: string | null }>;
+interface LocalUser {
+  uid: string;
+  email: string;
+  password: string;
+  displayName: string | null;
+}
+
+function getLocalUsers(): LocalUser[] {
+  if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(window.localStorage.getItem("lumina-users") ?? "[]");
+    return JSON.parse(window.localStorage.getItem("lumina-users") ?? "[]") as LocalUser[];
   } catch {
     return [];
   }
 }
 
-function saveLocalUsers(users: Array<{ uid: string; email: string; password: string; displayName: string | null }>) {
+function saveLocalUsers(users: LocalUser[]) {
   window.localStorage.setItem("lumina-users", JSON.stringify(users));
 }
 

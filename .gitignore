@@ -7,10 +7,10 @@ out-tsc
 *.tsbuildinfo
 .expo
 .expo-shared
-
+.env
 # dependencies
 node_modules
-
+.replit
 # IDEs and editors
 /.idea
 .project
