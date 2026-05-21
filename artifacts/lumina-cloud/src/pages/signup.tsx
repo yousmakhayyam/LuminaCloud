@@ -69,7 +69,7 @@ export default function SignupPage() {
               <BookOpen className="h-4 w-4 text-purple-400 absolute -bottom-0.5 -right-0.5" />
             </div>
             <span className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              LuminaCloud
+              NovaShelf
             </span>
           </div>
           <h1 className="text-2xl font-bold text-white">Create your library</h1>

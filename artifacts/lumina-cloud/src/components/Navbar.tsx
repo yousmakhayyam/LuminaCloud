@@ -27,7 +27,7 @@ export default function Navbar() {
               <BookOpen className="h-4 w-4 text-purple-400 absolute -bottom-0.5 -right-0.5" />
             </div>
             <span className="text-xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-              LuminaCloud
+              NovaShelf
             </span>
           </Link>
 

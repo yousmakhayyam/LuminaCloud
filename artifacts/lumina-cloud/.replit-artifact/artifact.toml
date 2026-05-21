@@ -1,6 +1,6 @@
 kind = "web"
 previewPath = "/"
-title = "LuminaCloud"
+title = "NovaShelf"
 version = "1.0.0"
 id = "artifacts/lumina-cloud"
 router = "path"

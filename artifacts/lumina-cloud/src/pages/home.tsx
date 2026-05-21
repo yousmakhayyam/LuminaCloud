@@ -79,7 +79,7 @@ export default function HomePage() {
           </h1>
 
           <p className="text-xl text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            LuminaCloud is a modern digital library that lets you upload, organize, and access your PDF collection from anywhere — securely stored in the cloud.
+            NovaShelf is a modern digital library that lets you upload, organize, and access your PDF collection from anywhere — securely stored in the cloud.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -129,7 +129,7 @@ export default function HomePage() {
                 <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
                 <div className="w-3 h-3 rounded-full bg-green-500/60" />
                 <div className="flex-1 mx-4 bg-white/5 rounded-md h-6 flex items-center px-3">
-                  <span className="text-xs text-slate-600">luminacloud.app/dashboard</span>
+                  <span className="text-xs text-slate-600">novashelf.app/dashboard</span>
                 </div>
               </div>
               {/* Preview content */}

@@ -14,7 +14,7 @@ export default function Footer() {
                 <BookOpen className="h-3.5 w-3.5 text-purple-400 absolute -bottom-0.5 -right-0.5" />
               </div>
               <span className="text-lg font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-                LuminaCloud
+                NovaShelf
               </span>
             </div>
             <p className="text-slate-500 text-sm leading-relaxed max-w-xs">
@@ -50,7 +50,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-white/5 mt-10 pt-6 flex flex-col sm:flex-row justify-between items-center gap-2">
-          <p className="text-slate-600 text-xs">© {new Date().getFullYear()} LuminaCloud. All rights reserved.</p>
+          <p className="text-slate-600 text-xs">© {new Date().getFullYear()} NovaShelf. All rights reserved.</p>
           <p className="text-slate-700 text-xs">Powered by Firebase & React</p>
         </div>
       </div>
